@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { reportService } from "../services/reportService";
+import { LoadError } from "../../../components/ui/LoadError";
 import type { ReportFilters } from "../types/report";
 type ReportType = "sales" | "purchases" | "lowStock" | "topSelling" | "profit" | "dailyClose";
 export function ReportsPage() {
@@ -107,7 +108,7 @@ export function ReportsPage() {
         if (loading)
             return <p className="text-slate-500 text-center py-8 text-sm">Cargando reporte...</p>;
         if (error)
-            return <p className="text-red-500 text-center py-8 text-sm">{error}</p>;
+            return <LoadError message={error} onRetry={() => { void loadReport(); }}/>;
         if (!data)
             return <p className="text-slate-500 text-center py-8 text-sm">No hay datos</p>;
         switch (selectedReport) {

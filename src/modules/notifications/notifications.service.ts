@@ -10,7 +10,7 @@ const clients = new Map<WebSocket, {
     role: UserRole;
     topics: Set<string>;
 }>();
-const permits = (role: UserRole, topic: string) => role === "ADMIN" || (role === "CAJERO" ? topic.startsWith("sale:") || topic.startsWith("cashregister:") || topic === "low_stock" : topic.startsWith("inventory:") || topic === "low_stock");
+const permits = (role: UserRole, topic: string) => role === "ADMIN" || topic.startsWith("product:") || (role === "CAJERO" ? topic.startsWith("sale:") || topic.startsWith("cashregister:") || topic === "low_stock" : topic.startsWith("inventory:") || topic === "low_stock");
 export function initWebSocket(server: Server) {
     const wss = new WebSocketServer({ server, path: "/ws", maxPayload: 16384, verifyClient: (info, done) => {
             const origin = info.origin;

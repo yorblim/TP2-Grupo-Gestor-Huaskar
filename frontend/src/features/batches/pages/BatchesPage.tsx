@@ -1,6 +1,8 @@
+import { LoadError } from "../../../components/ui/LoadError";
+import { apiFetch } from "../../../api";
 import { useLiveRefresh } from "../../../hooks/useLiveRefresh";
 import { productService } from "../../products/services/productService";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Product } from "../../products/types/product";
 interface Batch {
     id: string;
@@ -11,6 +13,15 @@ interface Batch {
     createdAt: string;
 }
 export function BatchesPage() {
+    const latestBatchRequest = useRef(0);
+    const [currentTime, setCurrentTime] = useState(() => Date.now());
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(Date.now()), 60000);
+        return () => clearInterval(timer);
+    }, []);
+    const [loadError, setLoadError] = useState("");
+    const [batchError, setBatchError] = useState("");
+    const [batchLoading, setBatchLoading] = useState(false);
     const [products, setProducts] = useState<Product[]>([]);
     const [batchesByProduct, setBatchesByProduct] = useState<Record<string, Batch[]>>({});
     const [loading, setLoading] = useState(true);
@@ -22,40 +33,26 @@ export function BatchesPage() {
     const [batchExpiration, setBatchExpiration] = useState("");
     const [error, setError] = useState("");
     const [processing, setProcessing] = useState(false);
-    const loadData = async () => {
-        setLoading(true);
+    const loadProductBatches = useCallback(async (productId: string) => {
+        const requestId = ++latestBatchRequest.current;
+        setBatchLoading(true); setBatchError("");
         try {
-            const allProducts = await productService.getAllOptions();
-            setProducts(allProducts);
-            const batchMap: Record<string, Batch[]> = {};
-            for (const product of allProducts) {
-                try {
-                    const res = await fetch(`/api/batches/product/${product.id}`, { credentials: "include" });
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.success)
-                            batchMap[product.id] = data.data;
-                    }
-                }
-                catch {
-                    // skip individual product batch loading errors
-                }
-            }
-            setBatchesByProduct(batchMap);
-        }
-        catch {
-            console.error("Error al cargar datos");
-        }
-        finally {
-            setLoading(false);
-        }
-    };
-    useLiveRefresh(loadData, ["inventory:"]);
-    useEffect(() => {
-        loadData();
+            const result = await apiFetch<{ data: Batch[] }>(`/api/batches/product/${productId}`);
+            setBatchesByProduct(previous => ({ ...previous, [productId]: result.data }));
+        } catch { if (requestId === latestBatchRequest.current) setBatchError("No se pudieron consultar los lotes del producto."); }
+        finally { if (requestId === latestBatchRequest.current) setBatchLoading(false); }
     }, []);
+    const loadData = useCallback(async () => {
+        setLoading(true); setLoadError("");
+        try { setProducts(await productService.getAllOptions()); }
+        catch { setLoadError("No se pudo cargar el catálogo de productos."); }
+        finally { setLoading(false); }
+    }, []);
+    useLiveRefresh(() => { void loadData(); if (expandedProduct) void loadProductBatches(expandedProduct); }, ["inventory:", "product:"]);
+    useEffect(() => { void loadData(); }, [loadData]);
+    useEffect(() => { if (expandedProduct) void loadProductBatches(expandedProduct); }, [expandedProduct, loadProductBatches]);
     const getDaysUntilExpiry = (expirationDate: string) => {
-        const now = new Date();
+        const now = new Date(currentTime);
         const exp = new Date(expirationDate);
         const diff = exp.getTime() - now.getTime();
         return Math.ceil(diff / (1000 * 60 * 60 * 24));
@@ -64,7 +61,7 @@ export function BatchesPage() {
         if (!expirationDate)
             return "";
         const days = getDaysUntilExpiry(expirationDate);
-        if (days < 0)
+        if (new Date(expirationDate).getTime() < currentTime)
             return "bg-red-100 text-red-700 border-red-200";
         if (days <= 7)
             return "bg-red-50 text-red-600 border-red-200";
@@ -76,7 +73,7 @@ export function BatchesPage() {
         if (!expirationDate)
             return "Sin vencimiento";
         const days = getDaysUntilExpiry(expirationDate);
-        if (days < 0)
+        if (new Date(expirationDate).getTime() < currentTime)
             return "Vencido";
         if (days === 0)
             return "Vence hoy";
@@ -91,8 +88,9 @@ export function BatchesPage() {
             setError("Completa todos los campos requeridos");
             return;
         }
-        const qty = parseInt(batchQuantity);
-        if (isNaN(qty) || qty <= 0) {
+        if (processing) return;
+        const qty = Number(batchQuantity);
+        if (!Number.isSafeInteger(qty) || qty <= 0) {
             setError("Cantidad inválida");
             return;
         }
@@ -142,6 +140,10 @@ export function BatchesPage() {
         </button>
       </div>
 
+      {loadError && <LoadError message={loadError} onRetry={() => { void loadData(); }}/>}
+      {batchError && expandedProduct && <LoadError message={batchError} onRetry={() => { void loadProductBatches(expandedProduct); }}/>}
+      {batchLoading && <p role="status" className="text-sm text-slate-600">Actualizando lotes del producto seleccionado...</p>}
+      <p className="text-sm text-slate-600">Abre un producto para consultar sus lotes. Los lotes vencidos no se pueden vender.</p>
       {showCreateForm && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
@@ -185,7 +187,7 @@ export function BatchesPage() {
         </div>)}
 
       <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-        {products.length === 0 ? (<div className="flex flex-col items-center justify-center py-16 px-4">
+        {loadError ? null : products.length === 0 ? (<div className="flex flex-col items-center justify-center py-16 px-4">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
               <span className="text-3xl">🏷️</span>
             </div>
@@ -208,7 +210,7 @@ export function BatchesPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-medium text-slate-600">
-                        {batches.reduce((s, b) => s + b.quantity, 0)} unidades en {batches.length} lotes
+                        {batchesByProduct[product.id] ? `${batches.length} lotes consultados` : "Abrir para consultar lotes"}
                       </span>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${product.stock <= product.minStock
                         ? "bg-red-100 text-red-700"
@@ -217,7 +219,7 @@ export function BatchesPage() {
                       </span>
                     </div>
                   </button>
-                  {isExpanded && (<div className="bg-slate-50 px-4 py-3 border-t border-slate-100">
+                  {isExpanded && !batchLoading && !batchError && (<div className="bg-slate-50 px-4 py-3 border-t border-slate-100">
                       {batches.length === 0 ? (<p className="text-sm text-slate-500 text-center py-4">No hay lotes para este producto</p>) : (<div className="overflow-x-auto">
                           <table className="w-full">
                             <thead>

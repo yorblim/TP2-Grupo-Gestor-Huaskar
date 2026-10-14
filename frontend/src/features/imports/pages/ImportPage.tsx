@@ -1,6 +1,8 @@
+import { useFeedback } from "../../../hooks/useFeedback";
 import { useState, useRef } from "react";
 
 export function ImportPage() {
+    const { notify } = useFeedback();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ created: number; errors: string[]; totalErrors: number } | null>(null);
@@ -25,7 +27,7 @@ export function ImportPage() {
       if (!d.success) throw new Error(d.message || "Error");
       setResult(d.data);
     } catch (err: any) {
-      alert(err.message);
+      notify(err.message);
     } finally {
       setLoading(false);
     }

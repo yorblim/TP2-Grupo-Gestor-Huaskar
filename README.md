@@ -78,9 +78,17 @@ Para otra base existente, compara primero el esquema y realiza un respaldo. No m
 
 ## Alcance pendiente
 
-La comparación con el PDF académico queda pendiente de recibirlo. La inspección visual de la web no se pudo realizar por la política del navegador de esta sesión; los PDF de prueba sí se renderizaron y revisaron. Se requiere revisión comercial del tratamiento tributario, devoluciones de cajas cerradas y costos históricos. No hay sincronización offline: operar por LAN requiere un servidor local disponible y configurar CORS_ORIGIN para su dirección. La imagen remota decorativa del login puede no cargar sin internet.
+Se aplicó la guía de usabilidad del Anexo 07 y se documentaron sus mejoras en [docs/USABILITY.md](docs/USABILITY.md). La inspección visual completa de la web y la encuesta con usuarios externos siguen pendientes; la comprobación de las operaciones por API no sustituye una prueba humana. Se requiere revisión comercial del tratamiento tributario, devoluciones de cajas cerradas y costos históricos. No hay sincronización offline: operar por LAN requiere un servidor local disponible y configurar CORS_ORIGIN para su dirección. El fondo del login es un SVG local y funciona sin descargar imágenes de terceros.
 
-No se realizó despliegue remoto ni publicación en GitHub. Deploy quedó como workflow_dispatch manual. compose.production.yml consume imágenes GHCR, mantiene la base interna y requiere un proxy HTTPS delante del frontend. Su configuración se validó, pero faltan datos del host y acceso al registro antes de realizar un despliegue remoto.
+Los cambios se publican mediante solicitudes de cambios en GitHub. No se realizó despliegue remoto. Deploy queda como workflow_dispatch manual. compose.production.yml consume imágenes GHCR, mantiene la base interna y requiere un proxy HTTPS delante del frontend. Su configuración se validó, pero faltan datos del host y acceso al registro antes de realizar un despliegue remoto.
+
+## Usabilidad y verificación
+
+La cabecera contiene Ayuda por rol y Cerrar sesión con etiqueta visible. Los formularios principales protegen datos sin guardar y muestran los errores que devuelve el servidor. Las operaciones importantes utilizan confirmaciones comunes. Inventario muestra el saldo previsto del ajuste y Caja permite revisar el arqueo antes del cierre, incluido un cierre con cero.
+
+El historial de ventas muestra series y números y permite filtrar por cliente, comprobante, fecha y método de pago. El resumen de Productos cubre el catálogo activo completo: sus cifras no dependen de la página seleccionada. El valor del inventario se indica al costo. Los lotes se consultan al abrir un producto y los avisos de WebSocket actualizan stock y catálogo entre los roles autorizados.
+
+Consulta [docs/VERIFICATION.md](docs/VERIFICATION.md) para las pruebas y los límites del alcance.
 
 ### Datos de demostración (desarrollo local)
 

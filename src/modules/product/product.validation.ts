@@ -8,7 +8,7 @@ export const createProductSchema = z.object({
     maxStock: z.number().int().nonnegative().nullable().optional(),
     active: z.boolean().optional(),
     minStock: z.number().int().min(0, "El stock mínimo no puede ser negativo"),
-    categoryId: z.string().optional(),
+    categoryId: z.string().nullable().optional(),
     barcode: z.string().trim().nullable().optional(),
     imageUrl: z.string().optional(),
 });

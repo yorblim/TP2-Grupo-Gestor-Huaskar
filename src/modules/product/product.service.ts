@@ -1,6 +1,15 @@
 import { createProductSchema } from "./product.validation";
 import { CreateProductInput, UpdateProductInput, ProductResponse } from "./product.types";
 import { prisma } from "../../lib/prisma";
+import { emitEvent } from "../notifications/notifications.service";
+export async function getProductSummary() {
+    const [summary] = await prisma.$queryRaw<Array<{ count: bigint; lowStock: bigint; retailValue: string; costValue: string }>>`
+      SELECT COUNT(*) AS "count", COUNT(*) FILTER (WHERE stock <= "minStock") AS "lowStock",
+      COALESCE(SUM(stock * price), 0)::text AS "retailValue",
+      COALESCE(SUM(stock * "costPrice"), 0)::text AS "costValue"
+      FROM "Product" WHERE active = true`;
+    return { count: Number(summary.count), lowStock: Number(summary.lowStock), retailValue: Number(summary.retailValue), costValue: Number(summary.costValue) };
+}
 import { AppError } from "../../utils/AppError";
 import { getPaginationParams, paginatedResult, type PaginatedResult } from "../../utils/pagination";
 function toProductResponse(product: any): ProductResponse {
@@ -40,6 +49,7 @@ export async function getAllProducts(query: Record<string, any> = {}): Promise<P
     const [products, total] = await Promise.all([
         prisma.product.findMany({
             where,
+            orderBy: { code: "asc" },
             include: { category: { select: { name: true } } },
             skip: (params.page - 1) * params.limit,
             take: params.limit,
@@ -83,6 +93,7 @@ export async function createProduct(data: CreateProductInput): Promise<ProductRe
         }
         return created;
     });
+    emitEvent("product:created", { productId: product.id });
     return toProductResponse(product);
 }
 export async function updateProduct(id: string, data: UpdateProductInput): Promise<ProductResponse> {
@@ -92,7 +103,8 @@ export async function updateProduct(id: string, data: UpdateProductInput): Promi
     }
     if (data.maxStock != null && data.maxStock < (data.minStock ?? existing.minStock))
         throw new AppError("El máximo no puede ser menor al mínimo.", 400);
-    if (data.minStock !== undefined && (data.maxStock ?? existing.maxStock) != null && data.minStock > (data.maxStock ?? existing.maxStock)!)
+    const effectiveMaximum = data.maxStock === undefined ? existing.maxStock : data.maxStock;
+    if (data.minStock !== undefined && effectiveMaximum != null && data.minStock > effectiveMaximum)
         throw new AppError("El mínimo supera el máximo configurado.", 400);
     const { stock: _stock, ...safeData } = data;
     const product = await prisma.product.update({
@@ -100,6 +112,7 @@ export async function updateProduct(id: string, data: UpdateProductInput): Promi
         data: safeData,
         include: { category: { select: { name: true } } },
     });
+    emitEvent("product:updated", { productId: product.id });
     return toProductResponse(product);
 }
 export async function getProductByBarcode(barcode: string): Promise<ProductResponse | null> {
@@ -115,5 +128,6 @@ export async function deleteProduct(id: string): Promise<boolean> {
         throw new AppError("Producto no encontrado o tiene registros asociados.", 404);
     }
     await prisma.product.update({ where: { id }, data: { active: false } });
+    emitEvent("product:updated", { productId: id });
     return true;
 }

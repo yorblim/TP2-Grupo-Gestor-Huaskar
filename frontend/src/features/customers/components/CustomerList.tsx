@@ -1,3 +1,4 @@
+import { useFeedback } from "../../../hooks/useFeedback";
 import { useAuth } from "../../auth/context/useAuth";
 import type { Customer } from "../types/customer";
 import { customerService } from "../services/customerService";
@@ -7,16 +8,17 @@ interface CustomerListProps {
     onEdit: (customer: Customer) => void;
 }
 export function CustomerList({ customers, onRefresh, onEdit }: CustomerListProps) {
+    const { confirm, notify } = useFeedback();
     const { user } = useAuth();
     const handleDelete = async (id: string) => {
-        if (!confirm("¿Eliminar este cliente?"))
+        if (!await confirm("¿Eliminar este cliente?"))
             return;
         try {
             await customerService.delete(id);
             onRefresh();
         }
         catch {
-            alert("Error al eliminar cliente");
+            notify("Error al eliminar cliente");
         }
     };
     return (<div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">

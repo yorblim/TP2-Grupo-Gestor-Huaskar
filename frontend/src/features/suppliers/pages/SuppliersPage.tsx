@@ -1,10 +1,15 @@
+import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
+import { LoadError } from "../../../components/ui/LoadError";
+import { useFeedback } from "../../../hooks/useFeedback";
 import { useAuth } from "../../auth/context/useAuth";
 import { useState, useCallback } from "react";
 import type { Supplier, SupplierStatus } from "../types/supplier";
 import { supplierService } from "../services/supplierService";
 import { useResourceList } from "../../../hooks/useResourceList";
 export function SuppliersPage() {
+    const { confirm, notify } = useFeedback();
     const { user } = useAuth();
+    const [saving, setSaving] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | undefined>(undefined);
     const [searchTerm, setSearchTerm] = useState("");
@@ -17,7 +22,7 @@ export function SuppliersPage() {
         status: "active" as SupplierStatus,
     });
     const [error, setError] = useState("");
-    const { data: suppliers = [], isLoading, refetch } = useResourceList("suppliers", useCallback(() => supplierService.getAll(), []));
+    const { data: suppliers = [], isLoading, isError, refetch } = useResourceList("suppliers", useCallback(() => supplierService.getAll(), []));
     const handleEdit = (supplier: Supplier) => {
         setEditingSupplier(supplier);
         setFormData({
@@ -42,18 +47,24 @@ export function SuppliersPage() {
         });
         setShowForm(true);
     };
-    const handleCancel = () => {
+    const dirty = showForm && (formData.name !== (editingSupplier?.name || "") || formData.ruc !== (editingSupplier?.ruc || "") || formData.contact !== (editingSupplier?.contact || "") || formData.phone !== (editingSupplier?.phone || "") || formData.address !== (editingSupplier?.address || "") || formData.status !== (editingSupplier?.status || "active"));
+    useUnsavedChanges(dirty);
+    const handleCancel = async () => {
+        if (saving || (dirty && !await confirm("¿Descartar los datos del proveedor sin guardar?", "Descartar"))) return;
         setShowForm(false);
         setEditingSupplier(undefined);
         setError("");
     };
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (saving) return;
         setError("");
         if (!formData.name || !formData.ruc || !formData.contact || !formData.phone || !formData.address) {
             setError("Todos los campos son obligatorios");
             return;
         }
+        if (!/^\d{11}$/.test(formData.ruc.trim())) { setError("El RUC debe contener 11 dígitos."); return; }
+        setSaving(true);
         try {
             if (editingSupplier) {
                 await supplierService.update(editingSupplier.id, formData);
@@ -76,17 +87,17 @@ export function SuppliersPage() {
         catch (err: unknown) {
             const message = err instanceof Error ? err.message : "Error al guardar proveedor";
             setError(message);
-        }
+        } finally { setSaving(false); }
     };
     const handleDelete = async (id: string) => {
-        if (!confirm("¿Estás seguro de eliminar este proveedor?"))
+        if (!await confirm("¿Estás seguro de eliminar este proveedor?"))
             return;
         try {
             await supplierService.delete(id);
             refetch();
         }
         catch {
-            console.error("Error al eliminar proveedor");
+            notify("No se pudo eliminar el proveedor. Comprueba si tiene compras asociadas.");
         }
     };
     const filteredSuppliers = suppliers.filter((supplier) => supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -110,6 +121,7 @@ export function SuppliersPage() {
         </div>
       </div>
 
+      {isError && <LoadError message="No se pudieron cargar los registros." onRetry={() => { void refetch(); }}/>}
       {showForm && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
@@ -154,7 +166,7 @@ export function SuppliersPage() {
                 {error && (<div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-lg text-xs">
                     {error}
                   </div>)}
-                <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg font-medium text-sm transition-colors">
+                <button disabled={saving} type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg font-medium text-sm transition-colors">
                   {editingSupplier ? "Actualizar Proveedor" : "Crear Proveedor"}
                 </button>
               </form>
@@ -162,7 +174,7 @@ export function SuppliersPage() {
           </div>
         </div>)}
 
-      {isLoading ? (<p className="text-slate-500 text-center py-8 text-sm">Cargando proveedores...</p>) : (<div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+      {isError ? null : isLoading ? (<p className="text-slate-500 text-center py-8 text-sm">Cargando proveedores...</p>) : (<div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
           {filteredSuppliers.length === 0 ? (<div className="flex flex-col items-center justify-center py-16 px-4">
               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
                 <span className="text-3xl">🏢</span>

@@ -5,6 +5,10 @@ import { auditMiddleware } from "../../middlewares/audit.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import { createProductSchema, updateProductSchema } from "./product.validation";
 const productRouter = Router();
+import { getProductSummary } from "./product.service";
+productRouter.get("/summary", authMiddleware, async (_req, res, next) => {
+    try { res.json({ success: true, data: await getProductSummary() }); } catch (error) { next(error); }
+});
 productRouter.get("/", authMiddleware, getAllProductsHandler);
 productRouter.get("/barcode/:barcode", authMiddleware, getProductByBarcodeHandler);
 productRouter.get("/:id", authMiddleware, getProductByIdHandler);

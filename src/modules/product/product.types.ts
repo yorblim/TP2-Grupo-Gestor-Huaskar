@@ -16,7 +16,7 @@ export type Product = {
 };
 export type CreateProductInput = {
     code: string;
-    barcode?: string;
+    barcode?: string | null;
     name: string;
     price: number;
     costPrice: number;
@@ -25,7 +25,7 @@ export type CreateProductInput = {
     maxStock?: number | null;
     active?: boolean;
     imageUrl?: string;
-    categoryId?: string;
+    categoryId?: string | null;
 };
 export type UpdateProductInput = Partial<CreateProductInput>;
 export type ProductResponse = Product & {

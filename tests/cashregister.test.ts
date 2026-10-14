@@ -40,6 +40,14 @@ describe('Cash Register Service', () => {
     expect(closed.difference).toBeDefined();
   });
 
+  it('closes an empty zero-balance session with a correct zero difference', async () => {
+    const user = await createTestUser();
+    const session = await openSession(user.id, { openingAmount: 0 });
+    const closed = await closeSession(session.id, user.id, { closingAmount: 0 });
+    expect(closed.status).toBe('closed');
+    expect(Number(closed.expectedAmount)).toBe(0);
+    expect(Number(closed.difference)).toBe(0);
+  });
   it('should get active session', async () => {
     const user = await createTestUser();
     await openSession(user.id, { openingAmount: 1000 });

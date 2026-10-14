@@ -1,3 +1,4 @@
+import { FeedbackProvider } from "./components/ui/FeedbackProvider";
 import { Suspense } from "react";
 import { LiveQueries } from "./LiveQueries";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -19,10 +20,10 @@ export function App() {
     return (<ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <WebSocketProvider>
+          <WebSocketProvider><FeedbackProvider>
             <LiveQueries />
             <Suspense fallback={<div role="status" className="p-8 text-center text-slate-500">Cargando módulo…</div>}><RouterProvider router={router}/></Suspense>
-          </WebSocketProvider>
+          </FeedbackProvider></WebSocketProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>);

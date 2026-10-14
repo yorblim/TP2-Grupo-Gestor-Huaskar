@@ -4,6 +4,7 @@ import { AppError } from "../../utils/AppError";
 import { getPaginationParams, paginatedResult, type PaginatedResult } from "../../utils/pagination";
 import { consumeFromBatches } from "../batch/batch.service";
 import { emitEvent } from "../notifications/notifications.service";
+import { dateRange } from "../../utils/dates";
 function toSaleResponse(sale: any): SaleResponse {
     return {
         id: sale.id,
@@ -42,14 +43,31 @@ export async function getSaleById(id: string): Promise<SaleResponse | null> {
 }
 export async function getAllSales(query: Record<string, any> = {}): Promise<PaginatedResult<SaleResponse>> {
     const params = getPaginationParams(query);
+    const where: Prisma.SaleWhereInput = {};
+    if (query.startDate || query.endDate) where.createdAt = dateRange(query.startDate, query.endDate);
+    if (query.paymentMethod) {
+        const methods = ["CASH", "CARD", "YAPE", "PLIN"] as const;
+        const method = String(query.paymentMethod).toUpperCase();
+        if (!methods.includes(method as typeof methods[number])) throw new AppError("Método de pago inválido.", 400);
+        const selected = method as typeof methods[number];
+        where.AND = [{ OR: [{ paymentMethod: selected }, { payments: { some: { method: selected } } }] }];
+    }
+    if (query.search) {
+        const search = String(query.search).trim().slice(0, 200);
+        where.OR = [{ customerName: { contains: search, mode: "insensitive" } }, { customerDocNumber: { contains: search } }];
+        const receipt = /^(BI01|FI01)-(\d+)$/i.exec(search);
+        if (receipt && Number.isSafeInteger(Number(receipt[2])) && Number(receipt[2]) <= 2147483647)
+            where.OR.push({ receiptSeries: receipt[1].toUpperCase(), receiptNumber: Number(receipt[2]) });
+    }
     const [sales, total] = await Promise.all([
         prisma.sale.findMany({
+            where,
             include: { items: true, payments: true },
             skip: (params.page - 1) * params.limit,
             take: params.limit,
             orderBy: { createdAt: "desc" },
         }),
-        prisma.sale.count(),
+        prisma.sale.count({ where }),
     ]);
     return paginatedResult(sales.map(toSaleResponse), total, params);
 }
@@ -145,8 +163,10 @@ export async function createSale(input: CreateSaleInput, cashierId: number): Pro
         throw error;
     });
     const response = toSaleResponse(result.sale);
-    if (result.created)
+    if (result.created) {
         emitEvent("sale:created", response);
+        emitEvent("inventory:movement_created", { productIds: response.items.map(item => item.productId) });
+    }
     return response;
 }
 export async function cancelSale(id: string, actorId?: number): Promise<SaleResponse | null> {
@@ -187,6 +207,7 @@ export async function cancelSale(id: string, actorId?: number): Promise<SaleResp
         return null;
     const result = toSaleResponse(sale);
     emitEvent("sale:cancelled", result);
+    emitEvent("inventory:movement_created", { productIds: result.items.map(item => item.productId) });
     return result;
 }
 export async function deleteSale(_id: string): Promise<boolean> {

@@ -33,7 +33,7 @@ export function LoginPage() {
     };
     return (<div className="relative isolate min-h-screen overflow-hidden bg-slate-950 text-white">
       <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{
-            backgroundImage: 'url("https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&w=1600&q=80")',
+            backgroundImage: 'url("/huskar-market.svg")',
             transform: "scale(1.04)",
         }}/>
 

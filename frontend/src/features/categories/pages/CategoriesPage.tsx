@@ -1,3 +1,5 @@
+import { LoadError } from "../../../components/ui/LoadError";
+import { useFeedback } from "../../../hooks/useFeedback";
 import { useAuth } from "../../auth/context/useAuth";
 import { useState, useEffect, useCallback } from "react";
 interface Category {
@@ -8,23 +10,25 @@ interface Category {
 }
 const API = "/api/categories";
 export function CategoriesPage() {
+    const { confirm, notify } = useFeedback();
     const { user } = useAuth();
     const [cats, setCats] = useState<Category[]>([]);
+    const [loadError, setLoadError] = useState("");
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<Category | null>(null);
     const [name, setName] = useState("");
     const [error, setError] = useState("");
     const load = useCallback(async () => {
-        setLoading(true);
+        setLoading(true); setLoadError("");
         try {
             const r = await fetch(API, { credentials: "include" });
             const d = await r.json();
-            if (d.success)
-                setCats(d.data);
+            if (!r.ok || !d.success) throw new Error("Error de carga");
+            setCats(d.data);
         }
         catch {
-            console.error("Error");
+            setLoadError("No se pudieron cargar las categorías.");
         }
         finally {
             setLoading(false);
@@ -58,19 +62,19 @@ export function CategoriesPage() {
         }
     };
     const handleDelete = async (id: string) => {
-        if (!confirm("¿Eliminar esta categoría?"))
+        if (!await confirm("¿Eliminar esta categoría?"))
             return;
         try {
             const r = await fetch(`${API}/${id}`, { method: "DELETE", credentials: "include" });
             const d = await r.json();
             if (!d.success) {
-                alert(d.message);
+                notify(d.message);
                 return;
             }
             load();
         }
         catch {
-            alert("Error al eliminar");
+            notify("Error al eliminar");
         }
     };
     return (<div className="space-y-5">
@@ -82,7 +86,8 @@ export function CategoriesPage() {
         <button onClick={openCreate} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Nueva Categoría</button>
       </div>
 
-      {loading ? <div className="bg-white rounded-lg p-8 text-center text-slate-500">Cargando...</div> : (<div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      {loadError && <LoadError message={loadError} onRetry={() => { void load(); }}/>}
+      {loadError ? null : loading ? <div className="bg-white rounded-lg p-8 text-center text-slate-500">Cargando...</div> : (<div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {cats.map((c) => (<div key={c.id} className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 hover:shadow-md transition-all">
               <div className="flex justify-between items-start mb-2">
                 <h3 className="font-semibold text-slate-900">{c.name}</h3>

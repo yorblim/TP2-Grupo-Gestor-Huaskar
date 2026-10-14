@@ -1,3 +1,5 @@
+import { LoadError } from "../../../components/ui/LoadError";
+import { useFeedback } from "../../../hooks/useFeedback";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../../../api";
 import { Pagination } from "../../../components/ui/Pagination";
@@ -8,13 +10,18 @@ import { SaleForm } from "../components/SaleForm";
 import { SaleList } from "../components/SaleList";
 import { SaleDetail } from "../components/SaleDetail";
 export function SalesPage() {
+    const { confirm } = useFeedback();
+    const [dirty, setDirty] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [draftFilters, setDraftFilters] = useState({ search: "", startDate: "", endDate: "", paymentMethod: "" });
+    const [filters, setFilters] = useState<Record<string, string>>({});
     const [showForm, setShowForm] = useState(false);
     const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
     const [lastSaleId, setLastSaleId] = useState<string | null>(null);
     const [page, setPage] = useState(1);
-    const { data: salesPage, isLoading, refetch } = useSales(page);
+    const { data: salesPage, isLoading, isError, error, refetch } = useSales(page, filters);
     const sales = salesPage?.data || [];
-    const { data: summary } = useQuery({ queryKey: ["sales-summary"], queryFn: async () => (await apiFetch<{
+    const { data: summary, isError: summaryError, refetch: retrySummary } = useQuery({ queryKey: ["sales-summary"], queryFn: async () => (await apiFetch<{
             data: {
                 todayRevenue: number;
                 todaySales: number;
@@ -25,6 +32,10 @@ export function SalesPage() {
         }>("/api/sales/summary")).data });
     const todayRevenue = summary?.todayRevenue ?? 0;
     const totalRevenue = summary?.totalRevenue ?? 0;
+    const closeForm = async () => {
+      if (busy || (dirty && !await confirm("¿Descartar esta venta sin guardar?", "Descartar"))) return;
+      setShowForm(false); setDirty(false);
+    };
     return (<div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div>
@@ -70,7 +81,17 @@ export function SalesPage() {
         </div>
       </div>
 
-      {isLoading ? (<div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+      {summaryError && <LoadError message="No se pudo actualizar el resumen de ventas." onRetry={() => { void retrySummary(); }}/>}
+      <form onSubmit={e => { e.preventDefault(); setPage(1); setFilters({ ...draftFilters }); }} className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5">
+        <label className="text-sm">Cliente o comprobante<input value={draftFilters.search} onChange={e => setDraftFilters({ ...draftFilters, search: e.target.value })} placeholder="Nombre o BI01-000001" className="mt-1 w-full rounded border border-slate-300 p-2"/></label>
+        <label className="text-sm">Desde<input type="date" value={draftFilters.startDate} onChange={e => setDraftFilters({ ...draftFilters, startDate: e.target.value })} className="mt-1 w-full rounded border border-slate-300 p-2"/></label>
+        <label className="text-sm">Hasta<input type="date" min={draftFilters.startDate || undefined} value={draftFilters.endDate} onChange={e => setDraftFilters({ ...draftFilters, endDate: e.target.value })} className="mt-1 w-full rounded border border-slate-300 p-2"/></label>
+        <label className="text-sm">Método de pago<select value={draftFilters.paymentMethod} onChange={e => setDraftFilters({ ...draftFilters, paymentMethod: e.target.value })} className="mt-1 w-full rounded border border-slate-300 p-2"><option value="">Todos</option><option value="cash">Efectivo</option><option value="card">Tarjeta</option><option value="yape">Yape</option><option value="plin">Plin</option></select></label>
+        <div className="flex items-end gap-2"><button type="submit" className="rounded-lg bg-orange-600 px-3 py-2 text-sm text-white">Filtrar</button><button type="button" onClick={() => { setDraftFilters({ search: "", startDate: "", endDate: "", paymentMethod: "" }); setFilters({}); setPage(1); }} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Limpiar</button></div>
+      </form>
+      <p className="text-sm text-slate-600">Los filtros se aplican al historial. Los resúmenes superiores muestran todas las ventas. Consulta Ayuda para aprender a registrar una venta.</p>
+      {isError && <LoadError message={error instanceof Error ? error.message : "No se pudieron cargar las ventas."} onRetry={() => { void refetch(); }}/>}
+      {!isError && (isLoading ? (<div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
           <div className="flex items-center justify-center py-12">
             <p className="text-slate-500 text-sm">Cargando ventas...</p>
           </div>
@@ -79,26 +100,26 @@ export function SalesPage() {
             <h2 className="text-sm font-semibold text-slate-900">Historial de Ventas</h2>
           </div>
           <SaleList sales={sales} onRefresh={refetch} onViewDetail={setSelectedSale}/>
-        </div>)}
+        </div>))}
 
       {showForm && !lastSaleId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
               <h2 className="text-base font-bold text-slate-900">Nueva Venta</h2>
-              <button onClick={() => setShowForm(false)} className="text-slate-500 hover:text-slate-700 transition-colors">
+              <button onClick={() => { void closeForm(); }} aria-label="Cerrar nueva venta" className="text-slate-500 hover:text-slate-700 transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
                 </svg>
               </button>
             </div>
             <div className="flex-1 min-h-0 flex flex-col">
-              <SaleForm onSuccess={(id) => { refetch(); setShowForm(false); if (id)
+              <SaleForm onDirtyChange={setDirty} onBusyChange={setBusy} onSuccess={(id) => { refetch(); setDirty(false); setShowForm(false); if (id)
             setLastSaleId(id); }}/>
             </div>
           </div>
         </div>)}
 
-      <Pagination page={page} totalPages={salesPage?.totalPages || 1} onPageChange={setPage}/>
+      {!isError && <Pagination page={page} totalPages={salesPage?.totalPages || 1} onPageChange={setPage}/>}
       {lastSaleId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 text-center">
             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">

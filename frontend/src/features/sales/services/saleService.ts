@@ -1,12 +1,14 @@
 import { API_URL } from "../../../api";
 import type { Sale, CreateSaleInput } from "../types/sale";
 export const saleService = {
-    async getPage(page = 1): Promise<{
+    async getPage(page = 1, filters: Record<string, string> = {}): Promise<{
         data: Sale[];
         total: number;
         totalPages: number;
-    }> { const response = await fetch(`${API_URL}/sales?page=${page}&limit=20`, { credentials: "include" }); if (!response.ok)
-        throw new Error("Error al obtener ventas"); return response.json(); },
+    }> { const query = new URLSearchParams({ ...filters, page: String(page), limit: "20" });
+        const response = await fetch(`${API_URL}/sales?${query}`, { credentials: "include" });
+        if (!response.ok) { const data = await response.json().catch(() => null); throw new Error(data?.message || "No se pudieron obtener las ventas."); }
+        return response.json(); },
     async getAll(): Promise<Sale[]> {
         const response = await fetch(`${API_URL}/sales`, { credentials: "include" });
         if (!response.ok)

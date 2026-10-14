@@ -24,7 +24,7 @@ export interface CreateProductInput {
     minStock: number;
     maxStock?: number | null;
     active?: boolean;
-    categoryId?: string;
+    categoryId?: string | null;
     barcode?: string | null;
 }
 export type UpdateProductInput = Partial<CreateProductInput>;

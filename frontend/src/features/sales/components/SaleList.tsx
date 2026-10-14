@@ -1,3 +1,4 @@
+import { useFeedback } from "../../../hooks/useFeedback";
 import { useAuth } from "../../auth/context/useAuth";
 import type { Sale, ReceiptType, DocumentType } from "../types/sale";
 import { saleService } from "../services/saleService";
@@ -7,9 +8,10 @@ interface SaleListProps {
     onViewDetail: (sale: Sale) => void;
 }
 export function SaleList({ sales, onRefresh, onViewDetail }: SaleListProps) {
+    const { confirm, notify } = useFeedback();
     const { user } = useAuth();
     const handleCancel = async (id: string) => {
-        if (!confirm("¿Anular esta venta? El stock de los productos será restaurado."))
+        if (!await confirm("¿Anular esta venta? El stock de los productos será restaurado."))
             return;
         try {
             await saleService.cancel(id);
@@ -17,7 +19,7 @@ export function SaleList({ sales, onRefresh, onViewDetail }: SaleListProps) {
         }
         catch (err: unknown) {
             const message = err instanceof Error ? err.message : "Error al anular venta";
-            alert(message);
+            notify(message);
         }
     };
     const getReceiptTypeLabel = (type: ReceiptType) => {
@@ -67,7 +69,7 @@ export function SaleList({ sales, onRefresh, onViewDetail }: SaleListProps) {
                 <th className="text-left py-3 px-4 text-xs font-semibold text-slate-700 uppercase tracking-wide">Venta</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-slate-700 uppercase tracking-wide">Comprobante</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-slate-700 uppercase tracking-wide">Cliente</th>
-                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-700 uppercase tracking-wide">Items</th>
+                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-700 uppercase tracking-wide">Productos</th>
                 <th className="text-right py-3 px-4 text-xs font-semibold text-slate-700 uppercase tracking-wide">Total</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-slate-700 uppercase tracking-wide">Pago</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-slate-700 uppercase tracking-wide">Fecha</th>
@@ -77,7 +79,7 @@ export function SaleList({ sales, onRefresh, onViewDetail }: SaleListProps) {
             </thead>
             <tbody>
               {sales.map((sale) => (<tr key={sale.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-4 text-sm font-medium text-slate-800">#{sale.id}</td>
+                  <td className="py-3 px-4 text-sm font-medium text-slate-800">{sale.receiptSeries && sale.receiptNumber ? `${sale.receiptSeries}-${String(sale.receiptNumber).padStart(6, "0")}` : `Venta ${sale.id.slice(-8)}`}</td>
                   <td className="py-3 px-4">
                     <span className={`text-xs font-medium px-2 py-1 rounded-full border ${sale.receiptType === "factura" ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-slate-100 text-slate-700 border-slate-200"}`}>
                       {getReceiptTypeLabel(sale.receiptType)}
@@ -96,7 +98,7 @@ export function SaleList({ sales, onRefresh, onViewDetail }: SaleListProps) {
                     {sale.status === "cancelled" ? (<span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded-full border border-red-200">Anulada</span>) : (<span className="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full border border-emerald-200">Activa</span>)}
                   </td>
                   <td className="py-3 px-4 text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
                       <button onClick={() => onViewDetail(sale)} className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg border border-slate-200 transition-colors">
                         Ver
                       </button>

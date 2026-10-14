@@ -61,7 +61,7 @@ export function SaleDetail({ sale, onClose }: SaleDetailProps) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
-          <h2 className="text-lg font-bold text-slate-900">Detalle de Venta #{sale.id}</h2>
+          <h2 className="text-lg font-bold text-slate-900">Detalle de venta {sale.receiptSeries && sale.receiptNumber ? `${sale.receiptSeries}-${String(sale.receiptNumber).padStart(6, "0")}` : sale.id.slice(-8)}</h2>
           <button
             onClick={onClose}
             className="text-slate-500 hover:text-slate-700 transition-colors"
@@ -72,7 +72,7 @@ export function SaleDetail({ sale, onClose }: SaleDetailProps) {
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-4">
+          <div className="space-y-4"><details className="text-xs text-slate-500"><summary>Referencia interna</summary>{sale.id}</details>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-xs font-semibold text-slate-600 mb-1">Tipo de Comprobante</p>

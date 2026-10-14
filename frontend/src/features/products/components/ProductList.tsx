@@ -1,3 +1,4 @@
+import { useFeedback } from "../../../hooks/useFeedback";
 import { useAuth } from "../../auth/context/useAuth";
 import type { Product } from "../types/product";
 import { productService } from "../services/productService";
@@ -7,16 +8,17 @@ interface ProductListProps {
     onEdit: (product: Product) => void;
 }
 export function ProductList({ products, onRefresh, onEdit }: ProductListProps) {
+    const { confirm, notify } = useFeedback();
     const { user } = useAuth();
     const handleDelete = async (id: string) => {
-        if (!confirm("¿Desactivar este producto? Se conservará su historial."))
+        if (!await confirm("¿Desactivar este producto? Se conservará su historial."))
             return;
         try {
             await productService.delete(id);
             onRefresh();
         }
         catch {
-            alert("Error al eliminar producto");
+            notify("Error al eliminar producto");
         }
     };
     return (<div className="overflow-hidden">

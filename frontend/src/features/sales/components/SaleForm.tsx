@@ -1,3 +1,5 @@
+import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
+import { LoadError } from "../../../components/ui/LoadError";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 import type { CreateSaleItemInput, PaymentMethod, ReceiptType, DocumentType, PaymentSplit } from "../types/sale";
@@ -6,8 +8,10 @@ import { saleService } from "../services/saleService";
 import { productService } from "../../products/services/productService";
 interface SaleFormProps {
     onSuccess: (saleId?: string) => void;
+    onDirtyChange: (dirty: boolean) => void;
+    onBusyChange: (busy: boolean) => void;
 }
-export function SaleForm({ onSuccess }: SaleFormProps) {
+export function SaleForm({ onSuccess, onDirtyChange, onBusyChange }: SaleFormProps) {
     const queryClient = useQueryClient();
     const submittingRef = useRef(false);
     const requestRef = useRef<{
@@ -42,8 +46,8 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
     const includedTax = Math.round(finalTotal * 18 / 118 * 100) / 100;
     const cashPortion = payments.length === 1 && payments[0].amount === 0 && payments[0].method === "cash" ? finalTotal : payments.filter(p => p.method === "cash").reduce((s, p) => s + p.amount, 0);
     const change = cashReceived ? Math.max(0, Number(cashReceived) - cashPortion) : 0;
-    const { data: catalog, isFetching } = useQuery({ queryKey: ["pos-products", debouncedSearch], queryFn: () => productService.getAll(1, 100, debouncedSearch) });
-    const { data: activeSession } = useQuery({ queryKey: ["cash-active"], queryFn: async () => { const r = await fetch("/api/cash-register/active", { credentials: "include" }); if (!r.ok)
+    const { data: catalog, isFetching, isError: catalogError, refetch: retryCatalog } = useQuery({ queryKey: ["pos-products", debouncedSearch], queryFn: () => productService.getAll(1, 100, debouncedSearch) });
+    const { data: activeSession, isError: sessionError, refetch: retrySession } = useQuery({ queryKey: ["cash-active"], queryFn: async () => { const r = await fetch("/api/cash-register/active", { credentials: "include" }); if (!r.ok)
             throw new Error("No se pudo comprobar caja"); return (await r.json()).data; } });
     useEffect(() => { const timer = setTimeout(() => setDebouncedSearch(searchTerm), 180); return () => clearTimeout(timer); }, [searchTerm]);
     useEffect(() => { if (catalog)
@@ -197,8 +201,12 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
             setLoading(false);
         }
     };
+    const dirty = !!(items.length || customerName || customerDocNumber || discountInput !== "0" || payments.length > 1 || payments[0]?.amount > 0 || payments[0]?.method !== "cash");
+    useUnsavedChanges(dirty);
+    useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
+    useEffect(() => { onBusyChange(loading); }, [loading, onBusyChange]);
     return (<div className="flex flex-col flex-1 min-h-0">
-      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+      <form aria-busy={loading} onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
         <div className="p-3 border-b border-slate-200 flex-shrink-0 bg-slate-50 space-y-2">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <div>
@@ -261,7 +269,9 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
           </div>
         </div>
 
-        {!activeSession && <div role="alert" className="m-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Debes <a className="font-semibold underline" href="/cash-register">abrir tu caja</a> para registrar ventas.</div>}
+        {catalogError && <LoadError message="No se pudo cargar el catálogo. Reintenta para actualizar el stock." onRetry={() => { void retryCatalog(); }}/>}
+        {sessionError && <LoadError message="No se pudo comprobar tu caja." onRetry={() => { void retrySession(); }}/>}
+        {!activeSession && !sessionError && <div role="alert" className="m-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Debes <a className="font-semibold underline" href="/cash-register">abrir tu caja</a> para registrar ventas.</div>}
         <div className="flex flex-col md:flex-row flex-1 min-h-0 gap-2 p-2">
           <div className="flex flex-col w-full md:w-1/2 min-h-0">
             <div className="flex items-center justify-between mb-1 flex-shrink-0">
@@ -381,8 +391,8 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
                         <span className="text-base font-bold text-slate-900">S/. {finalTotal.toFixed(2)}</span>
                       </div>
                     </div>
-                    {error && (<div className="bg-red-50 border border-red-200 text-red-600 px-2 py-1 rounded text-xs mb-1">{error}</div>)}
-                    <button type="submit" disabled={loading || items.length === 0 || !activeSession} className="w-full bg-orange-500 hover:bg-orange-600 text-white py-1.5 rounded font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    {error && (<div role="alert" className="bg-red-50 border border-red-200 text-red-600 px-2 py-1 rounded text-xs mb-1">{error}</div>)}
+                    <button type="submit" disabled={loading || items.length === 0 || !activeSession || sessionError || catalogError} className="w-full bg-orange-500 hover:bg-orange-600 text-white py-1.5 rounded font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                       {loading ? "Procesando..." : `Registrar Venta - S/. ${finalTotal.toFixed(2)}`}
                     </button>
                   </div>

@@ -1,3 +1,5 @@
+import { useFeedback } from "../../../hooks/useFeedback";
+import { LoadError } from "../../../components/ui/LoadError";
 import { useState } from "react";
 import type { Customer } from "../types/customer";
 import { customerService } from "../services/customerService";
@@ -6,11 +8,14 @@ import { CustomerForm } from "../components/CustomerForm";
 import { CustomerList } from "../components/CustomerList";
 
 export function CustomersPage() {
+  const { confirm } = useFeedback();
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: customers = [], isLoading, refetch } = useResourceList(
+  const { data: customers = [], isLoading, isError, refetch } = useResourceList(
     "customers",
     () => customerService.getAll()
   );
@@ -25,13 +30,15 @@ export function CustomersPage() {
     setShowForm(true);
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    if (busy || (dirty && !await confirm("¿Descartar los datos del cliente sin guardar?", "Descartar"))) return;
+    setDirty(false);
     setShowForm(false);
     setEditingCustomer(undefined);
   };
 
   const handleSuccess = () => {
-    refetch();
+    refetch(); setDirty(false);
     setShowForm(false);
     setEditingCustomer(undefined);
   };
@@ -61,6 +68,7 @@ export function CustomersPage() {
         </div>
       </div>
 
+      {isError && <LoadError message="No se pudieron cargar los registros." onRetry={() => { void refetch(); }}/>}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
@@ -79,6 +87,9 @@ export function CustomersPage() {
             </div>
             <div className="p-6">
               <CustomerForm
+                key={editingCustomer?.id || "new"}
+                onDirtyChange={setDirty}
+                onBusyChange={setBusy}
                 onSuccess={handleSuccess}
                 customer={editingCustomer}
                 mode={editingCustomer ? 'edit' : 'create'}
@@ -88,7 +99,7 @@ export function CustomersPage() {
         </div>
       )}
 
-      {isLoading ? (
+      {isError ? null : isLoading ? (
         <p className="text-slate-500 text-center py-8 text-sm">Cargando clientes...</p>
       ) : (
         <CustomerList customers={filteredCustomers} onRefresh={refetch} onEdit={handleEdit} />

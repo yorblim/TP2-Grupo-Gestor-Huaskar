@@ -1,3 +1,6 @@
+import { LoadError } from "../../../components/ui/LoadError";
+import { useFeedback } from "../../../hooks/useFeedback";
+import { apiList } from "../../../api";
 import { CashMovements } from "./CashMovements";
 import { useState, useEffect, useCallback } from "react";
 import { useWebSocket } from "../../websocket/context/useWebSocket";
@@ -14,6 +17,8 @@ interface CashRegisterSession {
     notes?: string;
 }
 export function CashRegisterPage() {
+    const { confirm } = useFeedback();
+    const [loadError, setLoadError] = useState("");
     const [sessions, setSessions] = useState<CashRegisterSession[]>([]);
     const [activeSession, setActiveSession] = useState<CashRegisterSession | null>(null);
     const [loading, setLoading] = useState(true);
@@ -27,28 +32,19 @@ export function CashRegisterPage() {
     } | null>(null);
     const { subscribe, on } = useWebSocket();
     const loadSessions = useCallback(async () => {
-        setLoading(true);
+        setLoading(true); setLoadError("");
         try {
-            const [sessionsRes, activeRes] = await Promise.all([
-                fetch("/api/cash-register", { credentials: "include" }),
+            const [sessionsData, activeRes] = await Promise.all([
+                apiList<CashRegisterSession>("/api/cash-register"),
                 fetch("/api/cash-register/active", { credentials: "include" }),
             ]);
-            const sessionsData = await sessionsRes.json();
-            if (sessionsData.success)
-                setSessions(sessionsData.data);
-            if (activeRes.ok) {
-                const activeData = await activeRes.json();
-                if (activeData.success)
-                    setActiveSession(activeData.data);
-                else
-                    setActiveSession(null);
-            }
-            else {
-                setActiveSession(null);
-            }
+            if (!activeRes.ok) throw new Error("No se pudo comprobar la caja activa.");
+            const activeData = await activeRes.json();
+            if (!activeData.success) throw new Error("No se pudo comprobar la caja activa.");
+            setSessions(sessionsData); setActiveSession(activeData.data);
         }
         catch {
-            console.error("Error al cargar sesiones");
+            setLoadError("No se pudieron cargar las cajas. Actualiza antes de abrir o cerrar una sesión.");
         }
         finally {
             setLoading(false);
@@ -75,8 +71,9 @@ export function CashRegisterPage() {
     const handleOpen = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
-        const amount = parseFloat(openingAmount);
-        if (isNaN(amount) || amount < 0) {
+        if (processing || loadError) return;
+        const amount = Number(openingAmount);
+        if (!openingAmount.trim() || !Number.isFinite(amount) || amount < 0) {
             setError("Ingresa un monto de apertura válido");
             return;
         }
@@ -107,14 +104,21 @@ export function CashRegisterPage() {
     const handleClose = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
-        const amount = parseFloat(closingAmount);
-        if (isNaN(amount) || amount <= 0) {
+        if (processing || loadError || !activeSession) return;
+        const amount = Number(closingAmount);
+        if (!closingAmount.trim() || !Number.isFinite(amount) || amount < 0) {
             setError("Ingresa un monto de cierre válido");
             return;
         }
         setCloseResult(null);
         setProcessing(true);
         try {
+            const response = await fetch("/api/cash-register/active", { credentials: "include" });
+            if (!response.ok) throw new Error("No se pudo actualizar el arqueo.");
+            const current = (await response.json()).data;
+            if (!current || current.id !== activeSession!.id) throw new Error("La caja cambió. Actualiza la pantalla antes de cerrar.");
+            const difference = Math.round((amount - Number(current.expectedAmount)) * 100) / 100;
+            if (!await confirm(`Efectivo esperado S/ ${Number(current.expectedAmount).toFixed(2)}. Contado S/ ${amount.toFixed(2)}. Diferencia S/ ${difference.toFixed(2)}. ¿Cerrar esta caja?`, "Cerrar caja")) return;
             const res = await fetch(`/api/cash-register/${activeSession!.id}/close`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -131,8 +135,8 @@ export function CashRegisterPage() {
             setClosingAmount("");
             loadSessions();
         }
-        catch {
-            setError("Error al cerrar caja");
+        catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Error al cerrar caja");
         }
         finally {
             setProcessing(false);
@@ -146,6 +150,7 @@ export function CashRegisterPage() {
     }
     return (<div className="space-y-4">
       <h1 className="text-xl font-bold text-slate-900">Caja</h1>
+      {loadError && <LoadError message={loadError} onRetry={() => { void loadSessions(); }}/>}
       {activeSession && <CashMovements sessionId={activeSession.id} onChange={loadSessions}/>}
 
       {activeSession ? (<div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">

@@ -1,21 +1,25 @@
+import { LoadError } from "../../../components/ui/LoadError";
+import { useFeedback } from "../../../hooks/useFeedback";
 import { useState, useEffect, useCallback } from "react";
 import type { User } from "../types/user";
 import { userService } from "../services/userService";
 export function UsersPage() {
+    const { confirm, notify } = useFeedback();
     const [users, setUsers] = useState<User[]>([]);
+    const [loadError, setLoadError] = useState("");
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<User | null>(null);
     const [form, setForm] = useState({ name: "", email: "", password: "", role: "CAJERO" as "ADMIN" | "CAJERO" | "ALMACEN" });
     const [error, setError] = useState("");
     const load = useCallback(async () => {
-        setLoading(true);
+        setLoading(true); setLoadError("");
         try {
             const data = await userService.getAll();
             setUsers(data.data);
         }
         catch {
-            console.error("Error al cargar usuarios");
+            setLoadError("No se pudieron cargar los usuarios.");
         }
         finally {
             setLoading(false);
@@ -55,14 +59,14 @@ export function UsersPage() {
         }
     };
     const handleDelete = async (id: number) => {
-        if (!confirm("¿Eliminar este usuario?"))
+        if (!await confirm("¿Eliminar este usuario?"))
             return;
         try {
             await userService.delete(id);
             load();
         }
         catch (err: any) {
-            alert(err.message);
+            notify(err.message);
         }
     };
     return (<div className="space-y-5">
@@ -74,7 +78,8 @@ export function UsersPage() {
         <button onClick={openCreate} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Nuevo Usuario</button>
       </div>
 
-      {loading ? (<div className="bg-white rounded-lg p-8 text-center text-slate-500">Cargando...</div>) : (<div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+      {loadError && <LoadError message={loadError} onRetry={() => { void load(); }}/>}
+      {loadError ? null : loading ? (<div className="bg-white rounded-lg p-8 text-center text-slate-500">Cargando...</div>) : (<div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="border-b bg-slate-50">

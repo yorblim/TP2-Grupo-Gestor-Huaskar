@@ -1,8 +1,9 @@
+import { HelpPanel } from "./HelpPanel";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth/context/useAuth";
 import { useState } from "react";
 import { useWebSocket } from "../../features/websocket/context/useWebSocket";
-import { LayoutDashboard, Package, ShoppingCart, Users, BarChart3, ClipboardList, Building2, FileText, Bell, LogOut, Moon, Sun, Menu, X, UserCog, Shield, Tags, Upload, Wallet, AlertTriangle, Wifi, WifiOff, } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, Users, BarChart3, ClipboardList, Building2, FileText, HelpCircle, LogOut, Moon, Sun, Menu, X, UserCog, Shield, Tags, Upload, Wallet, AlertTriangle, Wifi, WifiOff, } from "lucide-react";
 import { canAccessPath, roleLabels } from "../../features/auth/permissions";
 const navItems = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -20,6 +21,7 @@ export function AdminLayout() {
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logout } = useAuth();
+    const [helpOpen, setHelpOpen] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
     const toggleDarkMode = () => {
@@ -38,8 +40,8 @@ export function AdminLayout() {
         const item = allItems.find((i) => path.includes(i.to));
         return item?.label || "Dashboard";
     };
-    const handleLogout = () => {
-        logout();
+    const handleLogout = async () => {
+        await logout();
         navigate("/login", { replace: true });
     };
     const initials = user?.name
@@ -59,6 +61,7 @@ export function AdminLayout() {
         ]
         : [...navItems, { to: "/batches", label: "Lotes", icon: ClipboardList }, { to: "/purchase-suggestions", label: "Sugerencias", icon: AlertTriangle }, { to: "/import", label: "Importar", icon: Upload }]).filter(item => canAccessPath(user?.role, item.to));
     return (<div className={`flex min-h-screen ${darkMode ? 'dark bg-slate-900' : 'bg-slate-50'}`}>
+      {helpOpen && <HelpPanel onClose={() => setHelpOpen(false)}/>}
       {/* Overlay for mobile */}
       {sidebarOpen && (<div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)}/>)}
 
@@ -69,7 +72,7 @@ export function AdminLayout() {
             <h1 className="text-2xl font-bold tracking-tight">HUSKAR</h1>
             <p className="text-sm text-slate-400 font-medium">Minimarket</p>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white">
+          <button aria-label="Cerrar menú" onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white">
             <X className="h-5 w-5"/>
           </button>
         </div>
@@ -99,9 +102,9 @@ export function AdminLayout() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className={`h-16 border-b flex items-center justify-between px-4 lg:px-6 shadow-sm ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+        <header className={`min-h-16 flex-wrap gap-2 py-2 border-b flex items-center justify-between px-4 lg:px-6 shadow-sm ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(true)} className={`p-2 rounded-lg transition-colors lg:hidden ${darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-100'}`}>
+            <button aria-label="Abrir menú" onClick={() => setSidebarOpen(true)} className={`p-2 rounded-lg transition-colors lg:hidden ${darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-100'}`}>
               <Menu className="h-5 w-5"/>
             </button>
             <h2 className={`text-lg lg:text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{getTitle()}</h2>
@@ -111,16 +114,14 @@ export function AdminLayout() {
             <button onClick={toggleDarkMode} className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-yellow-400 hover:bg-slate-700' : 'text-slate-500 hover:bg-orange-50 hover:text-orange-500'}`} title={darkMode ? "Modo claro" : "Modo oscuro"}>
               {darkMode ? <Sun className="h-5 w-5"/> : <Moon className="h-5 w-5"/>}
             </button>
-            <button className={`p-2 rounded-lg transition-colors relative ${darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-500 hover:bg-orange-50 hover:text-orange-500'}`} title="Notificaciones">
-              <Bell className="h-5 w-5"/>
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full"></span>
-            </button>
-            <button onClick={handleLogout} className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-500 hover:bg-orange-50 hover:text-orange-500'}`} title="Cerrar sesión">
-              <LogOut className="h-5 w-5"/>
+            <button type="button" onClick={() => setHelpOpen(true)} className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-orange-50"><HelpCircle className="h-4 w-4"/>Ayuda</button>
+            <button onClick={handleLogout} className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-500 hover:bg-orange-50 hover:text-orange-500'}`} title="Cerrar sesión">
+              <LogOut className="h-5 w-5"/><span className="text-sm">Cerrar sesión</span>
             </button>
           </div>
         </header>
         <main className={`flex-1 p-4 lg:p-8 overflow-auto ${darkMode ? 'bg-slate-900' : ''}`}>
+          <div className="mb-4 text-sm text-slate-600">{user?.name} · {user ? roleLabels[user.role] : ""}</div>
           <Outlet />
         </main>
       </div>
@@ -129,6 +130,6 @@ export function AdminLayout() {
 function WsIndicator() {
     const { connected } = useWebSocket();
     return connected
-        ? <Wifi className="h-4 w-4 text-emerald-500" aria-label="Conectado en tiempo real"/>
-        : <WifiOff className="h-4 w-4 text-red-500" aria-label="Sin conexión en tiempo real"/>;
+        ? <span role="status" className="flex items-center gap-1 text-xs text-emerald-700"><Wifi className="h-4 w-4"/>Conectado</span>
+        : <span role="status" className="flex items-center gap-1 text-xs text-red-700"><WifiOff className="h-4 w-4"/>Sin conexión</span>;
 }

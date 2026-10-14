@@ -5,6 +5,23 @@ import { prisma } from './setup';
 import { createProduct } from '../src/modules/product/product.service';
 import { createSale, cancelSale, getAllSales } from '../src/modules/sale/sale.service';
 describe('Sales Service', () => {
+    it('filters receipts, customers, dates and split payment methods across the complete history', async () => {
+        const product = await createProduct({ code: 'FILTER001', name: 'Producto filtro', price: 10, stock: 30, minStock: 1 });
+        const cashierId = await testCashier();
+        const first = await createSale({ receiptType: 'boleta', customerName: 'Cliente búsqueda única', paymentMethod: 'card', items: [{ productId: product.id, quantity: 1 }], payments: [{ method: 'card', amount: 6 }, { method: 'cash', amount: 4 }] }, cashierId);
+        const second = await createSale({ receiptType: 'boleta', customerName: 'Cliente distinto', paymentMethod: 'yape', items: [{ productId: product.id, quantity: 1 }] }, cashierId);
+        await prisma.sale.update({ where: { id: first.id }, data: { createdAt: new Date('2026-10-14T04:59:59Z') } });
+        await prisma.sale.update({ where: { id: second.id }, data: { createdAt: new Date('2026-10-14T05:00:00Z') } });
+        const split = await getAllSales({ paymentMethod: 'cash', search: 'búsqueda', limit: 1 });
+        expect(split.total).toBe(1); expect(split.data[0].id).toBe(first.id);
+        const byDate = await getAllSales({ startDate: '2026-10-14', endDate: '2026-10-14' });
+        expect(byDate.data.map(s => s.id)).toEqual([second.id]);
+        const receipt = await getAllSales({ search: `${first.receiptSeries}-${String(first.receiptNumber).padStart(6, '0')}` });
+        expect(receipt.total).toBe(1); expect(receipt.data[0].id).toBe(first.id);
+        expect((await getAllSales({ search: 'cliente inexistente' })).total).toBe(0);
+        await expect(getAllSales({ paymentMethod: 'invalid' })).rejects.toMatchObject({ statusCode: 400 });
+        await expect(getAllSales({ startDate: '2026-10-15', endDate: '2026-10-14' })).rejects.toMatchObject({ statusCode: 400 });
+    });
     it('should create a sale and deduct stock', async () => {
         const product = await createProduct({
             code: 'SALE001',
