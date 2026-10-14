@@ -24,6 +24,8 @@ model Product {
   price     Decimal
   costPrice Decimal  @default(0)
   stock     Int
+  active    Boolean @default(true)
+  maxStock  Int?
   minStock  Int
   imageUrl  String?
   createdAt DateTime @default(now())
@@ -45,10 +47,15 @@ model ProductBatch {
   quantity       Int
   expirationDate DateTime?
   receivedAt     DateTime @default(now())
+  unitCost       Decimal @default(0)
+  purchaseOrderId String?
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([productId, code])
+  @@index([productId, receivedAt])
+  @@index([expirationDate])
 }
 
 model Supplier {
@@ -95,6 +102,14 @@ model Sale {
   status            SaleStatus    @default(ACTIVE)
   createdAt         DateTime     @default(now())
   cancelledAt       DateTime?
+  requestId         String? @unique
+  requestHash       String?
+  cashierId         Int?
+  cashier           User? @relation(fields: [cashierId], references: [id], onDelete: Restrict)
+  cashSessionId     String?
+  cashSession       CashRegisterSession? @relation(fields: [cashSessionId], references: [id], onDelete: Restrict)
+  receiptSeries     String?
+  receiptNumber     Int?
   updatedAt         DateTime     @updatedAt
 
   customerId String?
@@ -103,6 +118,10 @@ model Sale {
   items             SaleItem[]
   inventoryMovements InventoryMovement[]
   payments          SalePayment[]
+
+  @@unique([receiptSeries, receiptNumber])
+  @@index([createdAt, status])
+  @@index([cashSessionId])
 }
 
 model SalePayment {
@@ -142,6 +161,8 @@ model SaleItem {
   id        String  @id @default(cuid())
   quantity  Int
   unitPrice Decimal
+  unitCost Decimal @default(0)
+  productName String @default("")
   subtotal  Decimal
   productId String
 
@@ -199,6 +220,9 @@ model PurchaseOrder {
 
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   items    PurchaseOrderItem[]
+  batches  ProductBatch[]
+
+  @@index([receivedAt, status])
 }
 
 model User {
@@ -206,17 +230,21 @@ model User {
   name      String
   email     String   @unique
   password  String
-  role      UserRole @default(USER)
+  role      UserRole @default(CAJERO)
+  tokenVersion Int @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   cashierSessions CashRegisterSession[] @relation("CashierOpened")
   closedSessions  CashRegisterSession[] @relation("CashierClosed")
+  sales Sale[]
+  cashMovements CashMovement[]
 }
 
 enum UserRole {
   ADMIN
-  USER
+  CAJERO
+  ALMACEN
 }
 
 enum PurchaseOrderStatus {
@@ -231,6 +259,7 @@ model PurchaseOrderItem {
   productName String
   quantity    Int
   unitPrice   Decimal
+  expirationDate DateTime?
   subtotal    Decimal
 
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
@@ -255,9 +284,36 @@ model CashRegisterSession {
   closedById Int?
   openedBy   User  @relation("CashierOpened", fields: [openedById], references: [id])
   closedBy   User? @relation("CashierClosed", fields: [closedById], references: [id])
+  sales Sale[]
+  movements CashMovement[]
+
+  @@index([openedById, status])
 }
 
 enum SessionStatus {
   OPEN
   CLOSED
+}
+
+model ReceiptCounter {
+ series String @id
+ value Int @default(0)
+}
+
+model CashMovement {
+ id String @id @default(cuid())
+ sessionId String
+ session CashRegisterSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+ userId Int
+ user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+ kind CashMovementKind
+ amount Decimal
+ reason String
+ createdAt DateTime @default(now())
+ @@index([sessionId, createdAt])
+}
+
+enum CashMovementKind {
+ INCOME
+ EXPENSE
 }

@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
 import { useState, useEffect } from "react";
 import type { CreateCustomerInput, Customer, UpdateCustomerInput } from "../types/customer";
 import { customerService } from "../services/customerService";
@@ -6,9 +7,11 @@ interface CustomerFormProps {
   onSuccess: () => void;
   customer?: Customer;
   mode?: 'create' | 'edit';
+  onDirtyChange: (dirty: boolean) => void;
+  onBusyChange: (busy: boolean) => void;
 }
 
-export function CustomerForm({ onSuccess, customer, mode = 'create' }: CustomerFormProps) {
+export function CustomerForm({ onSuccess, customer, mode = 'create', onDirtyChange, onBusyChange }: CustomerFormProps) {
   const [formData, setFormData] = useState<CreateCustomerInput>({
     name: "",
     phone: "",
@@ -29,7 +32,9 @@ export function CustomerForm({ onSuccess, customer, mode = 'create' }: CustomerF
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError("");
+    if (!formData.name.trim()) { setError("Escribe el nombre del cliente."); return; }
     setLoading(true);
 
     try {
@@ -39,13 +44,17 @@ export function CustomerForm({ onSuccess, customer, mode = 'create' }: CustomerF
         await customerService.create(formData);
       }
       onSuccess();
-    } catch {
-      setError(mode === 'edit' ? "Error al actualizar cliente" : "Error al crear cliente");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : mode === 'edit' ? "Error al actualizar cliente" : "Error al crear cliente");
     } finally {
       setLoading(false);
     }
   };
 
+  const dirty = formData.name !== (customer?.name || "") || (formData.phone || "") !== (customer?.phone || "") || (formData.address || "") !== (customer?.address || "");
+  useUnsavedChanges(dirty);
+  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => { onBusyChange(loading); }, [loading, onBusyChange]);
   return (
     <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
       <h3 className="text-lg font-semibold text-slate-800 mb-6 flex items-center">

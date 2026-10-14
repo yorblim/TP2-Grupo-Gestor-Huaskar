@@ -20,13 +20,26 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    command: ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+    volumes:
+      - uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "3000:3000"
     environment:
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/gestor_huaskar?schema=public
       - JWT_SECRET=${JWT_SECRET}
       - PORT=3000
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-production}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost}
+      - BUSINESS_NAME=${BUSINESS_NAME:-HUSKAR Minimarket}
+      - BUSINESS_ADDRESS=${BUSINESS_ADDRESS:-Cusco, Perú}
+      - BUSINESS_RUC=${BUSINESS_RUC:-}
+      - BUSINESS_PHONE=${BUSINESS_PHONE:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,3 +57,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

@@ -8,6 +8,7 @@ on:
 
 env:
   NODE_VERSION: "20"
+  TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gestor_huaskar_test?schema=public
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gestor_huaskar_test?schema=public
   JWT_SECRET: ci-secret-key
 
@@ -44,7 +45,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Lint Check
+      - name: Backend Type Check
         run: npx tsc --noEmit
 
   unit-tests:
@@ -79,7 +80,7 @@ jobs:
         run: npx prisma generate
 
       - name: Run Unit Tests
-        run: npx vitest run tests/unit/
+        run: npm run test:unit
 
   integration-tests:
     name: Integration Tests
@@ -113,7 +114,7 @@ jobs:
         run: npx prisma generate
 
       - name: Run Integration Tests
-        run: npx vitest run tests/products.test.ts tests/auth.test.ts tests/suppliers.test.ts tests/customers.test.ts tests/inventory.test.ts tests/purchases.test.ts tests/sales.test.ts tests/reports.test.ts
+        run: npm run test:integration
 
   docker-build:
     name: Docker Build

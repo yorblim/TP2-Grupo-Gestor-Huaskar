@@ -1,36 +1,31 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { saleService } from "../features/sales/services/saleService";
 import type { CreateSaleInput } from "../features/sales/types/sale";
-
 const SALES_KEY = "sales";
-
-export function useSales() {
-  return useQuery({
-    queryKey: [SALES_KEY],
-    queryFn: () => saleService.getAll(),
-  });
+export function useSales(page = 1, filters: Record<string, string> = {}) {
+    return useQuery({
+        queryKey: [SALES_KEY, page, filters],
+        queryFn: () => saleService.getPage(page, filters),
+    });
 }
-
 export function useCreateSale() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateSaleInput) => saleService.create(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [SALES_KEY] }),
-  });
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (input: CreateSaleInput) => saleService.create(input),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: [SALES_KEY] }),
+    });
 }
-
 export function useCancelSale() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => saleService.cancel(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [SALES_KEY] }),
-  });
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => saleService.cancel(id),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: [SALES_KEY] }),
+    });
 }
-
 export function useDeleteSale() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => saleService.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [SALES_KEY] }),
-  });
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => saleService.delete(id),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: [SALES_KEY] }),
+    });
 }

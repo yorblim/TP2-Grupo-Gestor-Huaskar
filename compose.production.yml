@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD}
+      POSTGRES_DB: gestor_huaskar
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  backend:
+    image: ghcr.io/${IMAGE_REPOSITORY:?Configura IMAGE_REPOSITORY}/backend:${IMAGE_TAG:-latest}
+    command: ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/gestor_huaskar?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Configura JWT_SECRET}
+      NODE_ENV: production
+      PORT: 3000
+      CORS_ORIGIN: ${CORS_ORIGIN:?Configura el origen HTTPS del frontend}
+      BUSINESS_NAME: ${BUSINESS_NAME:-HUSKAR Minimarket}
+      BUSINESS_ADDRESS: ${BUSINESS_ADDRESS:-Cusco, Perú}
+      BUSINESS_RUC: ${BUSINESS_RUC:-}
+      BUSINESS_PHONE: ${BUSINESS_PHONE:-}
+    volumes:
+      - uploads:/app/uploads
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  frontend:
+    image: ghcr.io/${IMAGE_REPOSITORY}/frontend:${IMAGE_TAG:-latest}
+    ports:
+      - "127.0.0.1:${FRONTEND_HTTP_PORT:-8080}:80"
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+volumes:
+  pgdata:
+  uploads:
