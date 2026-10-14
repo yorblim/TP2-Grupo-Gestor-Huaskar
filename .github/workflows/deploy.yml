@@ -1,8 +1,7 @@
 name: Deploy
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,6 +14,8 @@ jobs:
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
 
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +56,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Deploy via SSH
-        if: ${{ secrets.DEPLOY_HOST != '' }}
+        if: ${{ env.DEPLOY_HOST != '' }}
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -63,6 +64,8 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             cd /app/gestor-huaskar
-            docker compose pull
-            docker compose up -d --force-recreate
+            export IMAGE_REPOSITORY=${{ env.REPO_LOWER }}
+            export IMAGE_TAG=${{ github.sha }}
+            docker compose -f compose.production.yml pull
+            docker compose -f compose.production.yml up -d --force-recreate
             docker image prune -f

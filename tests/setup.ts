@@ -1,54 +1,22 @@
-/// <reference types="node" />
 import { PrismaClient } from '@prisma/client';
 import { beforeAll, afterAll, beforeEach } from 'vitest';
-import { execSync } from 'child_process';
-
-// Base de datos de test PostgreSQL (usa puerto distinto al de desarrollo)
-const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/gestor_huaskar_test?schema=public';
-process.env.DATABASE_URL = TEST_DATABASE_URL;
-
+import { execFileSync } from 'node:child_process';
+const url = process.env.TEST_DATABASE_URL;
+if (!url)
+    throw new Error('TEST_DATABASE_URL requerida: usa una base de pruebas separada.');
+const name = new URL(url).pathname.slice(1);
+if (!/^gestor_huaskar_test(?:_[a-zA-Z0-9_]+)?$/.test(name))
+    throw new Error('Se rechaza ejecutar pruebas sobre una base que no sea de test.');
+process.env.DATABASE_URL = url;
+process.env.JWT_SECRET = 'integration-test-secret-only';
+process.env.NODE_ENV = 'test';
 const prisma = new PrismaClient();
-
-beforeAll(async () => {
-  console.log('🧪 Setting up test database...');
-  
-  // Sincronizar esquema en la base de datos de test
-  try {
-    execSync('npx prisma db push --force-reset --accept-data-loss --skip-generate', {
-      stdio: 'inherit',
-      env: { ...process.env, DATABASE_URL: TEST_DATABASE_URL },
-    });
-  } catch (error) {
-    console.log('⚠️  db push failed, make sure PostgreSQL is running on port 5433');
-    console.log('   You can run: docker run -d -p 5433:5432 -e POSTGRES_PASSWORD=postgres postgres:16-alpine');
-    throw error;
-  }
-});
-
-afterAll(async () => {
-  console.log('🧹 Cleaning up test database...');
-  await prisma.$disconnect();
-});
-
+beforeAll(async () => { const cli = process.platform === 'win32' ? 'node_modules/prisma/build/index.js' : 'node_modules/prisma/build/index.js'; execFileSync(process.execPath, [cli, 'migrate', 'deploy'], { env: { ...process.env, DATABASE_URL: url }, stdio: 'inherit' }); });
+afterAll(() => prisma.$disconnect());
 beforeEach(async () => {
-  try {
-    await prisma.inventoryMovement.deleteMany();
-    await prisma.salePayment.deleteMany();
-    await prisma.saleItem.deleteMany();
-    await prisma.sale.deleteMany();
-    await prisma.purchaseOrderItem.deleteMany();
-    await prisma.purchaseOrder.deleteMany();
-    await prisma.productBatch.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.category.deleteMany();
-    await prisma.cashRegisterSession.deleteMany();
-    await prisma.auditLog.deleteMany();
-    await prisma.supplier.deleteMany();
-    await prisma.customer.deleteMany();
-    await prisma.user.deleteMany();
-  } catch (error) {
-    console.log('⚠️  Error cleaning tables:', error);
-  }
+    // Only test fixtures in the explicitly guarded database are removed.
+    await prisma.$transaction([
+        prisma.auditLog.deleteMany(), prisma.cashMovement.deleteMany(), prisma.inventoryMovement.deleteMany(), prisma.salePayment.deleteMany(), prisma.saleItem.deleteMany(), prisma.sale.deleteMany(), prisma.productBatch.deleteMany(), prisma.purchaseOrderItem.deleteMany(), prisma.purchaseOrder.deleteMany(), prisma.cashRegisterSession.deleteMany(), prisma.product.deleteMany(), prisma.category.deleteMany(), prisma.supplier.deleteMany(), prisma.customer.deleteMany(), prisma.user.deleteMany(), prisma.receiptCounter.deleteMany()
+    ]);
 });
-
 export { prisma };

@@ -16,39 +16,35 @@ import importRouter from "../modules/import/import.routes";
 import batchRouter from "../modules/batch/batch.routes";
 import cashregisterRouter from "../modules/cashregister/cashregister.routes";
 import purchaseSuggestionRouter from "../modules/purchasesuggestion/purchasesuggestion.routes";
-
+import { authMiddleware, requireRole } from "../middlewares/auth.middleware";
 const router = Router();
-
 router.get("/", (_req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "API de Gestor Huaskar v1.0",
-  });
+    res.status(200).json({
+        success: true,
+        message: "API de Gestor Huaskar v1.0",
+    });
 });
-
 router.get("/ping", (_req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "ping ok",
-  });
+    res.status(200).json({
+        success: true,
+        message: "ping ok",
+    });
 });
-
 router.use("/auth", authRouter);
 router.use("/products", productRouter);
 router.use("/categories", categoryRouter);
-router.use("/sales", saleRouter);
-router.use("/customers", customerRouter);
-router.use("/inventory", inventoryRouter);
-router.use("/suppliers", supplierRouter);
-router.use("/purchases", purchaseRouter);
-router.use("/reports", reportRouter);
-router.use("/audit-logs", auditRouter);
-router.use("/uploads", uploadRouter);
-router.use("/print", printRouter);
-router.use("/pdf", pdfRouter);
-router.use("/import", importRouter);
-router.use("/batches", batchRouter);
-router.use("/cash-register", cashregisterRouter);
-router.use("/purchase-suggestions", purchaseSuggestionRouter);
-
+router.use("/sales", authMiddleware, requireRole("ADMIN", "CAJERO"), saleRouter);
+router.use("/customers", authMiddleware, requireRole("ADMIN", "CAJERO"), customerRouter);
+router.use("/inventory", authMiddleware, requireRole("ADMIN", "ALMACEN"), inventoryRouter);
+router.use("/suppliers", authMiddleware, requireRole("ADMIN", "ALMACEN"), supplierRouter);
+router.use("/purchases", authMiddleware, requireRole("ADMIN", "ALMACEN"), purchaseRouter);
+router.use("/reports", authMiddleware, requireRole("ADMIN"), reportRouter);
+router.use("/audit-logs", authMiddleware, requireRole("ADMIN"), auditRouter);
+router.use("/uploads", authMiddleware, requireRole("ADMIN", "ALMACEN"), uploadRouter);
+router.use("/print", authMiddleware, requireRole("ADMIN", "CAJERO"), printRouter);
+router.use("/pdf", authMiddleware, requireRole("ADMIN", "CAJERO"), pdfRouter);
+router.use("/import", authMiddleware, requireRole("ADMIN", "ALMACEN"), importRouter);
+router.use("/batches", authMiddleware, requireRole("ADMIN", "ALMACEN"), batchRouter);
+router.use("/cash-register", authMiddleware, requireRole("ADMIN", "CAJERO"), cashregisterRouter);
+router.use("/purchase-suggestions", authMiddleware, requireRole("ADMIN", "ALMACEN"), purchaseSuggestionRouter);
 export default router;

@@ -1,0 +1,18 @@
+import { lazy } from "react";
+export const LoginPage = lazy(() => import("../features/auth/pages/LoginPage").then(module => ({ default: module.LoginPage })));
+export const DashboardPage = lazy(() => import("../features/dashboard/pages/DashboardPage").then(module => ({ default: module.DashboardPage })));
+export const ProductsPage = lazy(() => import("../features/products/pages/ProductsPage").then(module => ({ default: module.ProductsPage })));
+export const SalesPage = lazy(() => import("../features/sales/pages/SalesPage").then(module => ({ default: module.SalesPage })));
+export const CustomersPage = lazy(() => import("../features/customers/pages/CustomersPage").then(module => ({ default: module.CustomersPage })));
+export const ReportsPage = lazy(() => import("../features/reports/pages/ReportsPage").then(module => ({ default: module.ReportsPage })));
+export const InventoryPage = lazy(() => import("../features/inventory/pages/InventoryPage").then(module => ({ default: module.InventoryPage })));
+export const SuppliersPage = lazy(() => import("../features/suppliers/pages/SuppliersPage").then(module => ({ default: module.SuppliersPage })));
+export const PurchasesPage = lazy(() => import("../features/purchases/pages/PurchasesPage").then(module => ({ default: module.PurchasesPage })));
+export const UsersPage = lazy(() => import("../features/users/pages/UsersPage").then(module => ({ default: module.UsersPage })));
+export const AuditLogsPage = lazy(() => import("../features/audit/pages/AuditLogsPage").then(module => ({ default: module.AuditLogsPage })));
+export const CategoriesPage = lazy(() => import("../features/categories/pages/CategoriesPage").then(module => ({ default: module.CategoriesPage })));
+export const ImportPage = lazy(() => import("../features/imports/pages/ImportPage").then(module => ({ default: module.ImportPage })));
+export const CashRegisterPage = lazy(() => import("../features/cashregister/pages/CashRegisterPage").then(module => ({ default: module.CashRegisterPage })));
+export const PurchaseSuggestionsPage = lazy(() => import("../features/purchasesuggestions/pages/PurchaseSuggestionsPage").then(module => ({ default: module.PurchaseSuggestionsPage })));
+export const BatchesPage = lazy(() => import("../features/batches/pages/BatchesPage").then(module => ({ default: module.BatchesPage })));
+export const NotFoundPage = lazy(() => import("../features/notfound/pages/NotFoundPage").then(module => ({ default: module.NotFoundPage })));

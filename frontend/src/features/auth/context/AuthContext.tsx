@@ -1,9 +1,11 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, type ReactNode } from "react";
 import type { AuthUser } from "../types/auth";
 import { logoutService, getProfileService } from "../services/authService";
 import { AuthContext } from "./authContextDef";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient=useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -17,12 +19,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = (_token: string, newUser: AuthUser) => {
+    queryClient.clear();
     setUser(newUser);
   };
 
   const logout = async () => {
-    await logoutService();
-    setUser(null);
+    try { await logoutService(); } finally { queryClient.clear();setUser(null); }
   };
 
   if (loading) {
