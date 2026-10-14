@@ -22,7 +22,7 @@ export function LoginPage() {
         try {
             const data = await loginService(email, password);
             login(data.token, data.user);
-            navigate("/dashboard", { replace: true });
+            navigate(homeForRole(data.user.role), { replace: true });
         }
         catch (err) {
             setError(err instanceof Error ? err.message : "Error de conexión");
